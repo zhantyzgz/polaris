@@ -69,3 +69,4 @@ data/tags.json
 data/pins.json
 plugins/logger.py
 plugins/logbot.py
+*.db

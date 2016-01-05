@@ -27,7 +27,7 @@ for font in [a for a in os.listdir(os.path.join('.', 'fonts')) if a.endswith('.t
 results = list()
 for a0 in range(frames):
     #blend the user photo with rekt.jpg. random opacity
-    alpha = random.randint(0, 85)/100
+    alpha = random.randint(10, 90)/100
     result = Image.blend(rekt, user_photo, alpha)
 
     #blend the result with some color. random opacity and color
