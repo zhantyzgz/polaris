@@ -8,7 +8,8 @@ commands = [
     '^msg',
     '^reload',
     '^stop',
-    '^tag'
+    '^tag',
+    '^remtag'
 ]
 action = 'typing'
 hidden = True
@@ -64,7 +65,7 @@ def run(msg):
         message = '👤 *' + name + '*\n🏷 '
         if 'tags' in users[uid]:
             for tag in tags:
-                if not tag in users[uid]:
+                if not tag in users[uid]['tags']:
                     message += tag + ' '
                     users[uid]['tags'].append(tag)
         else:
@@ -73,6 +74,36 @@ def run(msg):
                 if not tag in users[uid]:
                     message += tag + ' '
                     users[uid]['tags'].append(tag)
+        save_json('data/users.json', users)
+    elif get_command(msg['text']) == 'remtag':
+        if not input:
+            return send_error(msg, 'argument')
+        tags = first_word(input).split('+')
+        uids = all_but_first_word(input)
+        if uids:
+            uids = uids.split()
+
+        for uid in uids:
+            if 'reply_to_message' in msg:
+                uid = str(msg['reply_to_message']['from']['id'])
+
+            if 'alias' in users[uid]:
+                name = users[uid]['alias']
+            elif 'username' in users[uid]:
+                name = users[uid]['username']
+            else:
+                name = uid
+
+
+        message = '👤 *' + name + '*\n🏷 '
+        if 'tags' in users[uid]:
+            for tag in tags:
+                if tag in users[uid]['tags']:
+                    message += '-' + tag + ' '
+                    users[uid]['tags'].remove(tag)
+        else:
+            message = '* no tags *'
+
         save_json('data/users.json', users)
 
     send_message(msg['chat']['id'], message, parse_mode="Markdown")

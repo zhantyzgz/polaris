@@ -62,8 +62,11 @@ def on_message_receive(msg):
     if 'text' not in msg:
         msg['text'] = ''
 
-    # Adds the locale to the message
-    #msg['locale'] = get_locale(msg['chat']['id']
+    # process tags
+    uid = str(msg['from']['id'])
+    if uid in users and 'tags' in users[uid]:
+        if 'muted' in users[uid]['tags']:
+            return
 
     # Uses the text from a reply as parameter
     if('reply_to_message' in msg and
@@ -110,7 +113,6 @@ def on_query_receive(query):
                     break
         if not more:
             break
-
 
 def load_plugins():
     for plugin in config['plugins']:
@@ -315,6 +317,8 @@ def tag_replace(text, msg=False):
 
 
 def escape_markup(text):
+    if not isinstance(text, str):
+        return text
     characters = ['_', '*', '[']
 
     for character in characters:
