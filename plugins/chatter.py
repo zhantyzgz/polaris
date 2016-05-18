@@ -1,39 +1,49 @@
-# -*- coding: utf-8 -*-
-from utils import *
-from cleverbot import Cleverbot
-from HTMLParser import HTMLParser
+from core.utils import *
 
-# If someone mentions the bot's username, it replies
-commands = [('@' + bot['username'].lower())]
-
-action = 'typing'
+commands = [
+    ('^' + bot.username, [])
+]
+description = 'Chat with the bot.'
 hidden = True
 
-def run(msg):
-    input = msg['text'].replace(bot['first_name'] + ' ', '')
+def run(m):
+    input = m.content.replace(bot.username + ' ', '')
 
-    cb = Cleverbot()
-    unescape = HTMLParser().unescape
-
+    
+    if m.receiver.id < 0:
+        chat = m.receiver.id
+    else:
+        chat = m.sender.id
+    
+    url = 'http://api.program-o.com/v2/chatbot/'
+    params = {
+        'bot_id': config.keys.chatbot,
+        'say': input,
+        'convo_id': chat,
+        'format': 'json'
+    }
+    
+    res = requests.get(url, params=params, timeout=config.timeout)
+    
+    if res.status_code != 200:
+        send_alert('%s\n%s' % (lang.errors.connection, res.text))
+        return send_message(m, lang.errors.connection)
+	
     try:
-        message = unescape(cb.ask(input))
+        chatting = DictObject(json.loads(res.text))
+        message = chatting.botsay
+
+        send_message(m, message)
     except:
-        message = u'🙃'
+        send_alert(res.text)
 
-    send_message(msg['chat']['id'], message, reply_to_message_id = msg['message_id'])
+def process(m):
+    if m.reply and m.type == 'text':
+        if (m.reply.sender.id == bot.id and
+                not m.content.startswith(config.start)):
+            m.content = bot.username + ' ' + m.content
 
-def process(msg):
-    if ('reply_to_message' in msg and
-        'text' in msg['reply_to_message'] and
-        'text' in msg):
-
-        if (str(msg['chat']['id']) in groups and
-            groups[str(msg['chat']['id'])]['special'] != 'log'):
-            if (msg['reply_to_message']['from']['id'] == bot['id'] and
-                    not msg['text'].startswith(config['command_start'])):
-                msg['text'] = '@' + bot['username'] + ' ' + msg['text']
-
-    if ('text' in msg and
-        msg['chat']['type'] == 'private' and
-        not msg['text'].startswith(config['command_start'])):
-        msg['text'] = '@' + bot['username'] + ' ' + msg['text']
+    if (m.type == 'text' and
+        m.receiver.id > 0 and
+        not m.content.startswith(config.start)):
+        m.content = bot.username + ' ' + m.content

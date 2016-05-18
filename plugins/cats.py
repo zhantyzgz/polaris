@@ -1,19 +1,17 @@
-# -*- coding: utf-8 -*-
-from utils import *
+from core.utils import *
 
-
-commands = ['^cat']
-
+commands = [
+    ('/cat', [])
+]
 description = 'Get a cat pic!'
-action = 'upload_photo'
 
 
-def run(msg):
+def run(m):
     url = 'http://thecatapi.com/api/images/get'
 
     params = {
         'format': 'src',
-        'api_key': config['api']['catapi']
+        'api_key': config.keys.cat_api
     }
 
     jstr = requests.get(
@@ -22,11 +20,24 @@ def run(msg):
     )
 
     if jstr.status_code != 200:
-        return send_error(msg, 'connection', jstr.status_code)
+        send_alert('%s\n%s' % (lang.errors.connection, jstr.text))
+        return send_message(m, lang.errors.connection)
 
     photo = download(url)
+    keyboard = {
+        'inline_keyboard': [[
+            {
+                'text': 'More...',
+                'url': 'http://thecatapi.com/'
+            },
+            {
+                'text': 'Source',
+                'url': url
+            }
+        ]]
+    }
 
     if photo:
-        send_photo(msg['chat']['id'], photo)
+        send_photo(m, photo, keyboard=keyboard)
     else:
-        send_error(msg, 'download')
+        send_message(m, lang.errors.download)

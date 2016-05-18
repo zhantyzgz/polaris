@@ -1,28 +1,17 @@
-# -*- coding: utf-8 -*-
-from __main__ import *
-from bs4 import BeautifulSoup
-
-from utils import *
+from core.utils import *
 
 commands = [
-    '^youtube',
-    '^video',
-    '^yt',
-    '^ytget'
+    ('/youtube', ['query'])
 ]
-
-parameters = {('query', True)}
-
 description = 'Returns the top results from YouTube.'
-action = 'typing'
+shortcut = '/yt '
 
 
-def run(msg):
-    input = get_input(msg['text'])
+def run(m):
+    input = get_input(m)
 
     if not input:
-        doc = get_doc(commands, parameters, description)
-        return send_message(msg['chat']['id'], doc, parse_mode="Markdown")
+        return send_message(m, lang.errors.input)
 
     url = 'https://www.googleapis.com/youtube/v3/search'
     params = {
@@ -30,48 +19,28 @@ def run(msg):
         'part': 'snippet',
         'maxResults': '1',
         'q': input,
-        'key': config['api']['googledev']
+        'key': config.keys.google_developer_console
     }
 
-    jstr = requests.get(
-            url,
-            params=params,
-    )
+    jstr = requests.get(url, params=params)
 
     if jstr.status_code != 200:
-        return send_error(msg, 'connection', jstr.status_code)
+        send_exception('%s\n%s' % (lang.errors.connection, jstr.text))
+        return send_message(m, lang.errors.connection)
 
     jdat = json.loads(jstr.text)
 
-    if get_command(msg['text']) == 'ytget':
-        url = 'http://www.youtubeinmp4.com/youtube.php'
-        params = {
-            'video': 'http://youtu.be/' + jdat['items'][0]['id']['videoId']
-        }
+    text = 'Watch "%s" on YouTube\nhttp://youtu.be/%s' % (
+        jdat['items'][0]['snippet']['title'],
+        jdat['items'][0]['id']['videoId'])
 
-        jstr = requests.get(url, params)
-        soup = BeautifulSoup(jstr.text, 'lxml')
-
-        download_link = soup.find(id='downloadMP4')['href']
-        result_url = 'http://www.youtubeinmp4.com/' + download_link
-
-        video = download(result_url)
-        caption = jdat['items'][0]['snippet']['title']
-
-        if video:
-            send_video(msg['chat']['id'], video, caption=caption)
-        else:
-            send_error(msg, 'download')
-    else:
-        text = 'Watch "{}" on YouTube\nhttp://youtu.be/{}'.format(
-                jdat['items'][0]['snippet']['title'],
-                jdat['items'][0]['id']['videoId'])
-
-        send_message(msg['chat']['id'], text)
+    send_message(m, text, preview=True)
 
 
-def inline(qry):
-    input = get_input(qry['query'])
+def inline(m):
+    input = get_input(m)
+    if not input:
+        input = lang.errors.input
 
     url = 'https://www.googleapis.com/youtube/v3/search'
     params = {
@@ -79,27 +48,68 @@ def inline(qry):
         'part': 'snippet',
         'maxResults': '8',
         'q': input,
-        'key': config['api']['googledev']
+        'key': config.keys.google_developer_console
     }
 
     jdat = send_request(url, params)
 
-    results_json = []
+    results = []
     for item in jdat['items']:
-        text = 'Watch "{}" on YouTube\nhttp://youtu.be/{}'.format(
-                item['snippet']['title'],
-                item['id']['videoId'])
+        text = 'Watch "%s" on YouTube\nhttp://youtu.be/%s' % (
+            item['snippet']['title'],
+            item['id']['videoId'])
+
+        url = 'https://www.googleapis.com/youtube/v3/videos'
+        params = {
+            'part': 'contentDetails',
+            'id': item['id']['videoId'],
+            'key': config.keys.google_developer_console
+        }
+
+        duration_iso = send_request(url, params)['items'][0]['contentDetails']['duration'].lower()
+
+        week = 0
+        day = 0
+        hour = 0
+        min = 0
+        sec = 0
+
+        value = ''
+        for c in duration_iso:
+            if c.isdigit():
+                value += c
+                continue
+
+            elif c == 'p':
+                pass
+            elif c == 't':
+                pass
+            elif c == 'w':
+                week = int(value) * 604800
+            elif c == 'd':
+                day = int(value) * 86400
+            elif c == 'h':
+                hour = int(value) * 3600
+            elif c == 'm':
+                min = int(value) * 60
+            elif c == 's':
+                sec = int(value)
+
+            value = ''
+
+        duration = week + day + hour + min + sec
 
         result = {
-            'type': 'article',
+            'type': 'video',
             'id': item['etag'].replace('"', ''),
             'title': item['snippet']['title'],
             'message_text': text,
             'description': item['snippet']['description'],
-            'url': 'http://youtu.be/' + item['id']['videoId'],
+            'mime_type': 'text/html',
+            'video_url': 'http://youtu.be/' + item['id']['videoId'],
+            'video_duration': duration,
             'thumb_url': item['snippet']['thumbnails']['default']['url']
         }
-        results_json.append(result)
+        results.append(result)
 
-    results = json.dumps(results_json)
-    answer_inline_query(qry['id'], results)
+    answer_inline_query(m, results)

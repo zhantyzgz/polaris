@@ -1,30 +1,26 @@
-# -*- coding: utf-8 -*-
-from utils import *
+from core.utils import *
 from bs4 import BeautifulSoup
 
-
 commands = [
-    '^joke',
-    '^sp',
-    '^sickipedia'
+    ('/joke', [])
 ]
+description = 'Returns a random Hot Sick, Rude, Offensive & Politically Incorrect joke from Sickipedia.'
+hidden = True
 
-description = 'Returns a random Hot Sick, Rude, Offensive & Politically Incorrect joke from [Sickipedia](http://sickipedia.org).'
-action = 'typing'
 
-
-def run(msg):
+def run(m):
     url = 'http://www.sickipedia.org/random'
 
     jstr = requests.get(url)
-
+    
     if jstr.status_code != 200:
-        return send_message(msg['chat']['id'], locale[get_locale(msg['chat']['id'])]['errors']['connection'].format(jstr.status_code), parse_mode="Markdown")
-
+        send_alert('%s\n%s' % (lang.errors.connection, jstr.text))
+        return send_message(m, lang.errors.connection)
+        
     soup = BeautifulSoup(jstr.text, 'lxml')
 
     text = soup.find(itemprop='text').get_text()
     text = text.replace('<br/>', '\n')
     text = text.replace('\t', '')
 
-    send_message(msg['chat']['id'], text, parse_mode="Markdown")
+    send_message(m, text, markup ='Markdown', preview = False)
