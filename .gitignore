@@ -70,3 +70,8 @@ data/pins.json
 plugins/logger.py
 plugins/logbot.py
 *.db
+.idea/misc.xml
+.idea/modules.xml
+.idea/polaris.iml
+.idea/workspace.xml
+.idea/vcs.xml
