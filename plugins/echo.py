@@ -76,6 +76,26 @@ def inline(m):
         },
         {
             'type': 'article',
+            'id': fullwidth(text),
+            'title': 'Ｆｕｌｌｗｉｄｔｈ',
+            'message_text': fullwidth(text),
+            'disable_web_page_preview': preview,
+            'description': fullwidth(text),
+            'thumb_url': 'http://i.imgur.com/GVVd8ek.png',
+            'parse_mode': 'HTML'
+        },
+        {
+            'type': 'article',
+            'id': fullwidth(text, quotes=True),
+            'title': '﻿Ｆｕｌｌｗｉｄｔｈ  ｗｉｔｈ  ｑｕｏｔｅｓ',
+            'message_text': fullwidth(text, quotes=True),
+            'disable_web_page_preview': preview,
+            'description': fullwidth(text, quotes=True),
+            'thumb_url': 'http://i.imgur.com/FhgB10A.png',
+            'parse_mode': 'HTML'
+        },
+        {
+            'type': 'article',
             'id': 'markdown:%s' % text,
             'title': 'Format with Markdown',
             'message_text': text,

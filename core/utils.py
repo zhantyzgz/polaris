@@ -201,6 +201,21 @@ def latcyr(text):
         text = text.replace(k, lc_list[k])
     return text
 
+def fullwidth(text, quotes=False):
+    normalwidth_list = '''!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~⦅⦆。¢£¬¦¥₩←↑→↓■○'''
+    fullwidth_list = '''！＂＃＄％＆＇（）＊＋，－．／０１２３４５６７８９：；＜＝＞？＠ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ［＼］＾＿｀ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ｛｜｝～｟｠｡￠￡￢￤￥￦￩￪￫￬￭￮'''
+    normal_to_full = {' ':'  '}
+    for i in range(len(normalwidth_list)):
+	    normal_to_full[normalwidth_list[i]] = fullwidth_list[i]
+    newtext = ''
+    for char in text:
+        if char in normal_to_full:
+            newtext += normal_to_full[char]
+        else:
+            newtext += char
+    if quotes:
+        newtext = '「'+newtext+'」'
+    return newtext
 
 def escape_markdown(text):
     characters = ['_', '*', '[']
