@@ -1,64 +1,82 @@
-# -*- coding: utf-8 -*-
-from __main__ import *
-from utils import *
-
+from core.utils import *
 
 commands = [
-    '^help',
-    '^commands',
-    '^genhelp',
-    '^h$'
+    ('/help', ['command'])
 ]
-
-parameters = {('command', False)}
-description = 'Get list of basic information for all commands, or more detailed documentation on a specified command.'
-action = 'typing'
+description = 'Prints help.'
+shortcut = '/h '
 
 
-def run(msg):
-    input = get_input(msg['text'])
+def run(m):
+    input = get_input(m)
+
+    message = lang.errors.results
 
     if input:
-        for i, v in plugins.items():
-            if not hasattr(v, 'hidden'):
-                if config['command_start'] + input == v.commands[0].replace('^', '#'):
-                    doc = config['command_start'] + v.commands[0].replace('^', '')
-                    if hasattr(v, 'parameters'):
-                        doc += format_parameters(v.parameters)
-                    doc += '\n' + v.description
-                    return send_message(msg['chat']['id'], doc,
-                                        parse_mode="Markdown")
+        for plugin in plugins:
+            for command, parameters in plugin.commands:
+                if command.replace('/', '') == input:
+                    message = plugin.description + '\n'
+                    i = 0
+                    for command, parameters in plugin.commands:
+                        message += '\n\t' + command.replace('/', config.start)
+                        if hasattr(plugin, 'shortcut'):
+                            if type(plugin.shortcut) is list:
+                                if plugin.shortcut[i]:
+                                    message += ' | %s' % plugin.shortcut[i].replace('/', config.start)
+                            else:
+                                message += ' | %s' % plugin.shortcut.replace('/', config.start)
+                        for parameter in parameters:
+                            message += ' <b>&lt;' + parameter + '&gt;</b>'
+                    break
     else:
-        help = ''
-        gen = ''
-        for i, v in plugins.items():
-            if hasattr(v, 'commands') and not hasattr(v, 'hidden'):
-                help += '\t' + config['command_start']
-                help += v.commands[0].replace('^', '')
+        message = '<b>Commands</b>:\n'
+        for plugin in plugins:
+            i = 0
+            if hasattr(plugin, 'hidden') and plugin.hidden:
+                continue
+            for command, parameters in plugin.commands:
+                message += '\t%s' % command.replace('/', config.start)
+                if hasattr(plugin, 'shortcut'):
+                    if type(plugin.shortcut) is list:
+                        if plugin.shortcut[i]:
+                            message += ' | %s' % plugin.shortcut[i].replace('/', config.start)
+                    else:
+                        message += ' | %s' % plugin.shortcut.replace('/', config.start)
+                
+                for parameter in parameters:
+                    message += ' <b>&lt;' + parameter + '&gt;</b>'
+                message += '\n'
+                i += 1
 
-                if hasattr(v, 'description'):
-                        gen += v.commands[0].replace('^', '')
-                        gen += ' - ' + v.description
-                        gen += '\n'
+    send_message(m, message, markup='HTML')
 
-                if hasattr(v, 'parameters'):
-                        help += format_parameters(v.parameters)
-                help += '\n'
+def inline(m):
+    input = get_input(m)
 
-        message = '*Commands*:\n' + help
+    results = []
+    
+    for plugin in plugins:
+        if hasattr(plugin, 'hidden') and plugin.hidden:
+            continue
+        for command, parameters in plugin.commands:
+            trigger = command.replace('/', '')            
+            for parameter in parameters:
+                trigger += ' <%s>' % parameter
+            
+            message = {
+                'message_text': command.replace('/', config.start),
+            }
+            
+            result = {
+                'type': 'article',
+                'id': command,
+                'title': trigger,
+                'input_message_content': message,
+                'description': remove_html(plugin.description),
+                'thumb_url': 'http://fa2png.io/media/icons/fa-terminal/96/16/ffffff_673ab7.png'
+            }
+            if hasattr(plugin,'inline'):
+                results.append(result)
 
-        if get_command(msg['text']) == 'genhelp':
-            return send_message(msg['chat']['id'], gen, parse_mode="Markdown",
-                                disable_web_page_preview=True)
-
-        if msg['from']['id'] != msg['chat']['id']:
-            if not send_message(msg['from']['id'], message,
-                                parse_mode="Markdown"):
-                return send_message(msg['chat']['id'], message,
-                                    parse_mode="Markdown")
-            return send_message(msg['chat']['id'],
-                                'I have sent it in a *private message*.',
-                                parse_mode="Markdown")
-        else:
-            return send_message(msg['chat']['id'], message,
-                                parse_mode="Markdown")
+    answer_inline_query(m, results)

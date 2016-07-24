@@ -1,63 +1,82 @@
-# -*- coding: utf-8 -*-
-from utils import *
-
+from core.utils import *
 
 commands = [
-    '^bus',
-    '^tranvia',
-    '^poste'
+    ('/poste', ['numero']),
+    ('/bus', ['linea'])
 ]
-
-parameters = (
-    ('id', True),
-)
-
 description = 'Servicio pensado para reutilizadores que pone a su disposición información sobre las operaciones que puede realizar sobre unos determinados conjuntos de datos de Zaragoza.'
-action = 'typing'
 hidden = True
 
 
-def run(msg):
-    input = get_input(msg['text'])
+def run(m):
+    input = get_input(m)
 
     if not input:
-        doc = get_doc(commands, parameters, description)
-        return send_message(msg['chat']['id'], doc, parse_mode="Markdown")
-    if (get_command(msg['text']) == 'bus' or
-        get_command(msg['text']) == 'poste'):
-        url = 'http://www.zaragoza.es/api/recurso/urbanismo-infraestructuras/transporte-urbano/poste/tuzsa-' + input.lstrip('0') + '.json'
+        return send_message(m, lang.errors.input)
+    
+    if get_command(m) == 'poste':
+        url = 'http://www.zaragoza.es/api/recurso/urbanismo-infraestructuras/transporte-urbano/poste/tuzsa-' + input.lstrip(
+            '0') + '.json'
         params = {
             'srsname': 'wgs84'
         }
-        jdat = send_request(url, params)
+        jstr = requests.get(url, params=params, timeout=config.timeout)
 
-        if not jdat:
-            return send_error(msg, 'connection')
+        if jstr.status_code != 200:
+            send_alert('%s\n%s' % (lang.errors.connection, jstr.text))
+            return send_message(m, lang.errors.connection)
 
-        if 'error' in jdat:
-            return send_error(msg, 'unknown')
+        jdat = json.loads(jstr.text)
 
-        title = '*{}*\n'.format(jdat['title'])
-        text = ''
+        street = jdat['title'].split(')')[-1].split('Lí')[0].strip()
+        poste = jdat['title'].split(')')[0].replace('(', '')
+        line = jdat['title'].split(street)[-1].strip()
+
+        text = '<b>{0}</b>\n\tPoste: {1}\n\t{2}\n\n'.format(street.title(), poste, line)
         for destino in jdat['destinos']:
-            text += destino['linea'] + ' ' + destino['destino']
-            text += '\n - ' + destino['primero']
-            text += '\n - ' + destino['segundo']
-            text += '\n'
+            text += '<b>%s %s</b>' % (destino['linea'], destino['destino'].rstrip(',').rstrip('.').title())
+            text += '\n • ' + destino['primero'].rstrip('.').replace('cin', 'ción')
+            text += '\n • ' + destino['segundo'].rstrip('.').replace('cin', 'ción')
+            text += '\n\n'
         text = text.rstrip('\n')
-        lon, lat = jdat['geometry']['coordinates']
-
-        photo_url = 'https://maps.googleapis.com/maps/api/streetview'
-        photo_params = {
-            'size': '640x320',
-            'location': str(lat) + ',' + str(lon),
-            'pitch': 16,
-            'key': config['api']['googledev']
+        
+        send_message(m, text, markup='HTML')
+    
+    elif get_command(m) == 'bus':
+        url = 'https://www.zaragoza.es/api/recurso/urbanismo-infraestructuras/transporte-urbano/linea/' + input + '.json'
+        params = {
+            'srsname': 'wgs84'
         }
+        jstr = requests.get(url, params=params, timeout=config.timeout)
 
-        photo = download(photo_url, params=photo_params)
-        if not send_photo(msg['chat']['id'], photo, text, reply_to_message_id=msg['message_id']):
-            send_message(msg['chat']['id'], title + text, reply_to_message_id=msg['message_id'], parse_mode="Markdown")
+        if jstr.status_code != 200:
+            send_alert('%s\n%s' % (lang.errors.connection, jstr.text))
+            return send_message(m, lang.errors.connection)
 
-    elif get_command(msg) == 'tranvia':
-        pass
+        jdat = json.loads(jstr.text)
+        
+        markers = []
+        max = 30
+        for item in jdat['result']:
+            if item['geometry']['type'] == 'Point':
+                lat = item['geometry']['coordinates'][1].__round__(6)
+                lon = item['geometry']['coordinates'][0].__round__(6)
+                markers.append('color:red|label:%s|%s,%s' % ('p', lat, lon))
+                max -= 1
+                
+                if max == 0:
+                    break
+
+        map_url = 'https://maps.googleapis.com/maps/api/staticmap'
+        map_params = {
+            'key': config.keys.google_developer_console,
+            'size': '640x320',
+            'markers': markers
+        }
+                
+        map = download(map_url, map_params, method = 'post')
+
+        if map:
+            send_photo(m, map)
+        else:
+            send_message(m, lang.errors.download)

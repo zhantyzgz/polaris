@@ -1,21 +1,10 @@
-# -*- coding: utf-8 -*-
-from __main__ import *
-from utils import *
-
+from core.utils import *
 
 commands = [
-    '^voice',
-    '^v ',
-    '^say'
+    ('/voice', ['lang', 'text'])
 ]
-
-parameters = (
-    ('language', False),
-    ('text', True),
-)
-
 description = 'Generates an audio file using Google Text-To-Speech API.'
-action = 'upload_audio'
+shortcut = '/v '
 
 langs = [
     'af', 'aq', 'ar', 'hy', 'ca', 'zh', 'zh-cn', 'zh-tw', 'zh-yue',
@@ -27,30 +16,30 @@ langs = [
 ]
 
 
-def run(msg):
-    input = get_input(msg['text'])
+def run(m):
+    input = get_input(m)
 
     if not input:
-        doc = get_doc(commands, parameters, description)
-        return send_message(msg['chat']['id'], doc, parse_mode="Markdown")
+        return send_message(m, lang.errors.input)
 
     for v in langs:
         if first_word(input) == v:
-            lang = v
+            language = v
             text = all_but_first_word(input)
             break
         else:
-            lang = 'en'
+            language = 'en-us'
             text = input
 
     url = 'http://translate.google.com/translate_tts'
     params = {
-        'tl': lang,
+        'tl': language,
         'q': text,
         'ie': 'UTF-8',
         'total': len(text),
         'idx': 0,
         'client': 'tw-ob',
+        'key': config.keys.google_developer_console
     }
     headers = {
         "Referer": 'http://translate.google.com/',
@@ -64,13 +53,69 @@ def run(msg):
     )
 
     if jstr.status_code != 200:
-        return send_message(msg['chat']['id'], locale[get_locale(msg['chat']['id'])]['errors']['connection'].format(jstr.status_code))
+        send_alert('%s\n%s' % (lang.errors.connection, jstr.text))
+        return send_message(m, lang.errors.connection)
 
     result_url = jstr.url
-
-    voice = download(result_url, headers=headers, params=params)
+    voice = mp3_to_ogg(download(result_url, headers=headers, params=params))
 
     if voice:
-        send_voice(msg['chat']['id'], voice)
+        send_voice(m, voice)
     else:
-        send_message(msg['chat']['id'], locale[get_locale(msg['chat']['id'])]['errors']['download'], parse_mode="Markdown")
+        send_message(m, lang.errors.download)
+        
+def inline(m):
+    input = get_input(m)
+
+    for v in langs:
+        if first_word(input) == v:
+            language = v
+            text = all_but_first_word(input)
+            break
+        else:
+            language = 'en-us'
+            text = input
+            
+    if not text:
+        text = ''
+
+    url = 'http://translate.google.com/translate_tts'
+    params = {
+        'tl': language,
+        'q': text,
+        'ie': 'UTF-8',
+        'total': len(text),
+        'idx': 0,
+        'client': 'tw-ob',
+        'key': config.keys.google_developer_console
+    }
+
+    jstr = requests.get(url, params=params)
+    
+    results = []
+    
+    if jstr.status_code != 200:
+        message = {
+            'message_text': '%s\n%s' % (lang.errors.connection, jstr.text),
+            'parse_mode': 'HTML'
+        }
+        result = {
+            'type': 'article',
+            'id': str(jstr.status_code),
+            'title': lang.errors.connection,
+            'input_message_content': message,
+            'description': jstr.text
+        }
+        results.append(result)
+        return
+
+
+    result = {
+        'type': 'voice',
+        'id': m.id,
+        'voice_url': jstr.url,
+        'title': text
+    }
+    results.append(result)
+
+    answer_inline_query(m, results)

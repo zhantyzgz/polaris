@@ -1,40 +1,18 @@
 {
-    "api": {
-        "telegram_bot": "",
-        "catapi": "",
-        "giphy": "",
-        "league_of_legends": ""
+    "bindings": "api",
+    "keys": {
+        "azure_key": null,
+        "bot_api_token": null,
+        "cat_api": null,
+        "giphy": null,
+        "google_developer_console": null,
+        "league_of_legends": null,
+        "openweathermap": null,
+        "tg_cli_port": null
     },
+    "owner": null,
     "plugins": [
-        "admin",
-        "help",
-        "about",
-        "echo",
-        "who",
-        "voice",
-        "chatter",
-        "cats",
-        "search",
-        "images",
-        "konachan",
-        "urbandictionary",
-        "interactions",
-        "league_of_legends"
+        "echo"
     ],
-    "ignore": {
-        "old_messages": true,
-        "media": false
-    },
-    "process": {
-        "new_chat_participant": true,
-        "left_chat_participant": true,
-        "reply_to_message": true,
-        "chatter": true
-    },
-    "admin": [
-        0
-    ],
-    "locale_file": "default",
-    "command_start": "/",
-    "handle_exceptions": true
+    "start": "/"
 }

@@ -1,109 +1,52 @@
-# -*- coding: utf-8 -*-
-from utils import *
-import subprocess
-import sys
+from core.utils import *
+from core.bot import start
 
 commands = [
-    '^run',
-    '^msg',
-    '^reload',
-    '^stop',
-    '^tag',
-    '^remtag'
+    ('/sh', ['command']),
+    ('/msg', ['chat id', 'message']),
+    ('/reload', []),
+    ('/refreshplugins', []),
+    ('/shutdown', [])
 ]
-action = 'typing'
+
 hidden = True
 
 
-def run(msg):
-    if not is_admin(msg):
-        return send_error(msg, 'permission')
+def run(m):
+    if not is_admin(m.sender.id):
+        return send_message(m, lang.errors.permission)
 
-    input = get_input(msg['text'])
+    input = get_input(m)
 
-    if get_command(msg['text']) == 'run':
+    if get_command(m) == 'sh':
         if not input:
-            return send_error(msg, 'argument')
-        message = '`{0}`'.format(subprocess.getoutput(input))
+            return send_message(m, lang.errors.argument)
+        message = '<code>%s</code>' % (subprocess.getoutput(input))
 
-    elif get_command(msg['text']) == 'msg':
+    elif get_command(m) == 'msg':
         if not input:
-            return send_error(msg, 'argument')
+            return send_message(m, lang.errors.argument)
         chat_id = first_word(input)
         text = get_input(input)
 
         if not send_message(chat_id, text):
-            return send_error(msg, 'argument')
+            return send_message(m, lang.errors.argument)
         return
 
-    elif get_command(msg['text']) == 'reload':
-        bot_init()
-        message = 'Bot reloaded!'
+    elif get_command(m) == 'reload':
+        message = '%s reloading!' % bot.first_name
+        send_message(m, message, markup='HTML')
+        start()
 
-    elif get_command(msg['text']) == 'stop':
-        is_started = False
-        sys.exit()
-    elif get_command(msg['text']) == 'tag':
-        if not input:
-            return send_error(msg, 'argument')
-        tags = first_word(input).split('+')
-        uid = all_but_first_word(input)
-        if uid:
-            uid = uid.split()
+    elif get_command(m) == 'refreshplugins':
+        message = 'Refreshing  %s plugin...' % bot.first_name
+        send_message(m, message, markup='HTML')
 
-        if 'reply_to_message' in msg:
-            uid = str(msg['reply_to_message']['from']['id'])
-        
-        if 'alias' in users[uid]:
-            name = users[uid]['alias']
-        elif 'username' in users[uid]:
-            name = users[uid]['username']
-        else:
-            name = uid
+        bot.list_plugins()
+        config.save(config)
 
+    elif get_command(m) == 'shutdown':
+        bot.started = False
+        message = '%s shutdown!' % bot.first_name
 
-        message = '👤 *' + name + '*\n🏷 '
-        if 'tags' in users[uid]:
-            for tag in tags:
-                if not tag in users[uid]['tags']:
-                    message += tag + ' '
-                    users[uid]['tags'].append(tag)
-        else:
-            users[uid]['tags'] = []
-            for tag in tags:
-                if not tag in users[uid]:
-                    message += tag + ' '
-                    users[uid]['tags'].append(tag)
-        save_json('data/users.json', users)
-    elif get_command(msg['text']) == 'remtag':
-        if not input:
-            return send_error(msg, 'argument')
-        tags = first_word(input).split('+')
-        uids = all_but_first_word(input)
-        if uids:
-            uids = uids.split()
-
-        for uid in uids:
-            if 'reply_to_message' in msg:
-                uid = str(msg['reply_to_message']['from']['id'])
-
-            if 'alias' in users[uid]:
-                name = users[uid]['alias']
-            elif 'username' in users[uid]:
-                name = users[uid]['username']
-            else:
-                name = uid
-
-
-        message = '👤 *' + name + '*\n🏷 '
-        if 'tags' in users[uid]:
-            for tag in tags:
-                if tag in users[uid]['tags']:
-                    message += '-' + tag + ' '
-                    users[uid]['tags'].remove(tag)
-        else:
-            message = '* no tags *'
-
-        save_json('data/users.json', users)
-
-    send_message(msg['chat']['id'], message, parse_mode="Markdown")
+    send_message(m, message, markup='HTML')

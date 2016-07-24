@@ -1,77 +1,92 @@
-# -*- coding: utf-8 -*-
-from utils import *
-from random import randint
-
+from core.utils import *
 
 commands = [
-    '^weather',
-    '^w ',
-    '^w$'
+    ('/weather', ['location']),
+    ('/forecast', ['location'])
 ]
+description = 'Returns the current temperature and weather conditions for a specified location using WeatherUnderground API.'
+shortcut = ['/w ', '/f ']
 
-parameters = {('location', True)}
-
-description = 'Returns the current temperature and weather conditions for a specified location.'
-action = 'upload_photo'
-
-
-def get_icon(weather_icon):
+def get_icon(icon):
     weather_emoji = {}
-    if weather_icon[2] == 'd':
-        weather_emoji['01'] = u'☀️'
+    if icon[:4] == 'nt_':
+        weather_emoji['clear'] = u'☀️'
+        weather_emoji['sunny'] = u'☀️'
+        icon = icon.lstrip('nt_')
     else:
-        weather_emoji['01'] = u'🌙'
-    weather_emoji['02'] = u'⛅️'
-    weather_emoji['03'] = u'☁️'
-    weather_emoji['04'] = u'☁️'
-    weather_emoji['09'] = u'🌧'
-    weather_emoji['10'] = u'🌦'
-    weather_emoji['11'] = u'⛈'
-    weather_emoji['13'] = u'🌨'
-    weather_emoji['50'] = u'🌫'
+        weather_emoji['clear'] = u'🌙'
+        weather_emoji['sunny'] = u'🌙'
+    weather_emoji['chancesnow'] = u'❄️'
+    weather_emoji['chanceflurries'] = u'❄️'
+    weather_emoji['chancerain'] = u'🌧'
+    weather_emoji['chancesleet'] = u'🌧'
+    weather_emoji['chancetstorms'] = u'🌩'
+    weather_emoji['cloudy'] = u'☁️'
+    weather_emoji['flurries'] = u'❄️'
+    weather_emoji['fog'] = u'🌫'
+    weather_emoji['hazy'] = u'🌫'
+    weather_emoji['mostlycloudy'] = u'🌥'
+    weather_emoji['mostlycloudy'] = u'🌤'
+    weather_emoji['partlycloudy'] = u'⛅️'
+    weather_emoji['partlysunny'] = u'⛅️'
+    weather_emoji['sleet'] = u'🌧'
+    weather_emoji['rain'] = u'🌧'
+    weather_emoji['sleet'] = u'🌧'
+    weather_emoji['snow'] = u'❄️'
+    weather_emoji['tstorms'] = u'⛈'
 
-    return weather_emoji[weather_icon[:2]]
+    return weather_emoji[icon]
 
 
-def run(msg):
-    input = get_input(msg['text'])
+def run(m):
+    input = get_input(m)
 
     if not input:
-        doc = get_doc(commands, parameters, description)
-        return send_message(msg['chat']['id'], doc, parse_mode="Markdown")
+        return send_message(m, lang.errors.input)
 
     lat, lon, locality, country = get_coords(input)
 
-    weather_url = 'http://api.openweathermap.org/data/2.5/weather'
-    weather_params = {
-        'lat': lat,
-        'lon': lon,
-        'units': 'metric',
-        'appid': config['api']['openweathermap']
-    }
+    url = 'http://api.wunderground.com/api/{0}/webcams/conditions/forecast/q/{1},{2}.json'.format(config.keys.weather,
+                                                                                                  lat, lon)
+    jstr = requests.get(url)
 
-    weather = send_request(weather_url, weather_params)
-    if not weather:
-        return send_error(msg, 'connection')
+    if jstr.status_code != 200:
+        send_alert('%s\n%s' % (lang.errors.connection, jstr.text))
+        return send_message(m, lang.errors.connection)
+    data = json.loads(jstr.text)
+    try:
+        weather = data['current_observation']
+        forecast = data['forecast']['simpleforecast']['forecastday']
+        webcams = data['webcams']
+    except:
+        return send_message(m, lang.errors.results)
 
-    if weather['cod'] == '404':
-        return send_error(msg, 'results')
+    title = '<b>Weather for '
 
-    photo_url = 'https://maps.googleapis.com/maps/api/streetview'
-    photo_params = {
-        'size': '640x320',
-        'location': str(lat) + ',' + str(lon),
-        'pitch': 16,
-        'key': config['api']['googledev']
-    }
+    message = locality + ' (' + country + '):</b>'
+    message += '\n' + str(weather['temp_c']) + u'ºC '
+    if (float(weather['feelslike_c']) - float(weather['temp_c'])) > 0.001:
+        message += '\(feels like ' + str(weather['feelslike_c']) + 'ºC)'
+    message += ' - ' + str(weather['weather']).title() + ' ' + get_icon(weather['icon'])
+    message += u'\n💧 ' + str(weather['relative_humidity']) + u' | 🌬 ' + str(weather['wind_kph']) + ' km/h'
 
-    message = locality + ' (' + country + ')'
-    message += '\n' + str(int(weather['main']['temp'])) + u'ºC - ' + str(weather['weather'][0]['description']).title() + ' ' + get_icon(weather['weather'][0]['icon'])
-    message += u'\n💧 ' + str(weather['main']['humidity']) + u'% | 🌬 ' + str(int(weather['wind']['speed'] * 3.6)) + ' km/h'
+    simpleforecast = '\n\n<b>Forecast: </b>\n'
+    for day in forecast:
+        simpleforecast += '\t<b>{0}</b>: {1}-{2}ºC - {4}\n'.format(day['date']['weekday'], day['low']['celsius'],
+                                                              day['high']['celsius'], day['conditions'],
+                                                              get_icon(day['icon']))
 
-    photo = download(photo_url, params=photo_params)
-    if photo:
-        if not send_photo(msg['chat']['id'], photo, caption=message):
-            send_message(msg['chat']['id'], message)
-    else:
-        send_error(msg, 'download')
+    if get_command(m) == 'weather' or get_command(m) == 'w':
+        if 'CURRENTIMAGEURL' in webcams[0]:
+            photo_url = webcams[0]['CURRENTIMAGEURL']
+            photo = download(photo_url)
+        else:
+            photo = None
+
+        if photo:
+            send_photo(m, photo, remove_html(message))
+        else:
+            send_message(m, title + message, markup='HTML')
+
+    elif get_command(m) == 'forecast':
+        send_message(m, title + message + simpleforecast, markup='HTML')
