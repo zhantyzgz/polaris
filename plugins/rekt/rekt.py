@@ -1,5 +1,6 @@
 from PIL import Image, ImageFont, ImageDraw
 from images2gif import writeGif #rare dependency, have to search alternatives
+from core.utils import *
 import os, random, time, tempfile, logging
 
 # todo: -port the script to a library other than images2gif
@@ -11,6 +12,13 @@ import os, random, time, tempfile, logging
 #            -send temporary-file gif
 #       -optimize
 #       -save binaries to some other location
+
+logging.basicConfig(level=logging.DEBUG, format=' %(asctime)s - %(levelname)s- %(message)s')
+
+commands = [
+    ('rekt', [])
+]
+description = 'Rektify your life.'
 
 def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115, dump=False):
     """"
@@ -29,6 +37,7 @@ def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115,
 
     """
     start = time.time()
+    logging.debug('Started rekt()')
     def proportional(n, coordinate=False):
         """ original working image_size was (640, 640) (all values are based on this).
         this just converts the number it is passed to a image_size-proportional value."""
@@ -53,6 +62,7 @@ def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115,
 
     frames_list = list()
     for a0 in range(number_of_frames):
+        logging.debug('rekting frame %s of %s...' % (a0, number_of_frames))
         #blend the user photo with rekt.jpg. random opacity
         rekt_alpha = random.randint(10, 90)/100
         result_frame = Image.blend(rekt_image, user_photo, rekt_alpha)
@@ -72,6 +82,7 @@ def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115,
             number_of_strings = random.randint(1, 6)
 
         for a1 in range(number_of_strings):
+            logging.debug('adding string %s of %s...' % (a1, number_of_strings))
             #print '#REKT'. random coordinates, color, size, font, angle and opacity
             color = (random.randint(0,255), random.randint(0,255),\
                      random.randint(0,255), random.randint(100, 255)) #last value is opacity
@@ -109,6 +120,7 @@ def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115,
             #paste the colored text to the output frame:
             result_frame.paste(colorfill_image, mask=text_image)
 
+        logging.debug('cropping frame...')
         #finally, we select a random square area to INTENSIFY
         x0 = random.randint(0, proportional(140, 0))
         y0 = random.randint(0, proportional(140, 1))
@@ -118,6 +130,9 @@ def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115,
         result_frame = result_frame.crop(crop_area).resize(image_size, resample=Image.NEAREST)
         #append the final image to a list, to make a gif
         frames_list.append(result_frame)
+        logging.debug('frame done!')
+    logging.debug('all frames done!')
+    logging.debug('writing gif to tempfile...')
     f = tempfile.NamedTemporaryFile(delete=False, suffix='.gif')
     writeGif(f.name, frames_list, duration=duration, repeat=True, dither=False, nq=0, subRectangles=False)
 
@@ -128,8 +143,28 @@ def rekt(user_photo, image_size=(260, 260), number_of_frames=12, duration=0.115,
     print('[%s] Wrote gif in %s seconds. size=%s,frames=%s.' % (time.time(), elapsed, size, frames))
     file = open(f.name, 'rb')
     print('[%s] file %s: %s kB' % (time.time(), f.name, os.stat(f.name).st_size / 1024))
+    logging.debug('finished rekt()')
     return file
 
+def run(m):
+    start = time.time()
+    try:
+        if m.reply:
+            user_id = m.reply.sender.id
+        else: #use sender's photo
+            user_id = m.sender.id
+        photo_id = bot.get_user_profile_photos(user_id, limit=1).photos[0][1].file_id
+        photo_file_info = bot.get_file(photo_id)
+        logging.debug('https://api.telegram.org/file/bot{0}/{1}'.format(TOKEN, photo_file_info.file_path))
+        photo_url = 'https://api.telegram.org/file/bot{0}/{1}'.format(TOKEN, photo_file_info.file_path)
+        photo_file = download(photo_url)
+        logging.debug('Downloaded profile image in %s seconds.' % (time.time() - start))
+    except: #if user has no profile photo
+        photo_file = Image.open('nophoto.png')
+    r = rekt(photo_file)
+    send_document(m, r, reply=m.id)
+    logging.debug('[SENT FILE]' + ('[' + str(time.time()) + '] ') + ('{' + str(message.from_user.id) + '} ') + message.text)
+    logging.debug('[ELAPSED] %s seconds.\n' % (time.time() - start))
 
 #Original pyTelegramBotAPI implementation:
 """

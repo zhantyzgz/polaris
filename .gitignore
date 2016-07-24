@@ -75,3 +75,5 @@ plugins/logbot.py
 .idea/polaris.iml
 .idea/workspace.xml
 .idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
